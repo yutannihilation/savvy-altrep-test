@@ -46,6 +46,7 @@ static const R_CallMethodDef CallEntries[] = {
 };
 
 void R_init_savvyAltrepTest(DllInfo *dll) {
+  init_altrep_class(dll);
   R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
   R_useDynamicSymbols(dll, FALSE);
 }
