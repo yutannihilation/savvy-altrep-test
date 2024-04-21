@@ -74,6 +74,7 @@ name = "savvy_altrep_test"
 version = "0.1.0"
 dependencies = [
  "savvy",
+ "savvy-ffi",
 ]
 
 [[package]]
