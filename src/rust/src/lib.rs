@@ -1,9 +1,10 @@
 use std::sync::OnceLock;
 
+use savvy::savvy_init;
 use savvy::{get_external_pointer_addr, savvy, sexp::na};
 use savvy_ffi::{
     altrep::{
-        DllInfo, R_altrep_class_t, R_altrep_data1, R_make_altinteger_class, R_new_altrep,
+        R_altrep_class_t, R_altrep_data1, R_make_altinteger_class, R_new_altrep,
         R_set_altinteger_Elt_method, R_set_altinteger_Get_region_method,
         R_set_altinteger_Is_sorted_method, R_set_altinteger_Max_method,
         R_set_altinteger_Min_method, R_set_altinteger_No_NA_method, R_set_altinteger_Sum_method,
@@ -15,9 +16,62 @@ use savvy_ffi::{
 
 static ALTINT_CLASS_VEC3: OnceLock<R_altrep_class_t> = OnceLock::new();
 
+pub trait AltInteger {
+    fn length(&mut self) -> usize;
+    fn elt(&mut self, i: usize) -> i32;
+}
+
+/// # Safety
+///
+/// This function is unsafe.
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+#[no_mangle]
+#[savvy_init]
+pub unsafe extern "C" fn init_altrep_classregister_altinteger_class<T: 'static + AltInteger>(
+    dll_info: *mut savvy::ffi::DllInfo,
+) {
+    let class_t = unsafe {
+        R_make_altinteger_class(
+            c"Vec<i32>".as_ptr(),
+            c"savvy-altvec-test-package".as_ptr(),
+            dll_info,
+        )
+    };
+
+    unsafe extern "C" fn altrep_length<T: 'static + AltInteger>(x: SEXP) -> R_xlen_t {
+        match get_external_pointer_addr(R_altrep_data1(x)) {
+            Ok(ptr) => AltInteger::length((ptr as *mut T).as_mut().unwrap()) as _,
+            Err(_) => 0,
+        }
+    }
+
+    unsafe extern "C" fn altinteger_elt<T: 'static + AltInteger>(
+        arg1: SEXP,
+        arg2: R_xlen_t,
+    ) -> std::os::raw::c_int {
+        match get_external_pointer_addr(R_altrep_data1(arg1)) {
+            Ok(ptr) => AltInteger::elt((ptr as *mut T).as_mut().unwrap(), arg2 as _) as _,
+            Err(_) => 0,
+        }
+    }
+
+    unsafe {
+        R_set_altrep_Length_method(class_t, Some(altrep_length::<T>));
+        // R_set_altinteger_No_NA_method(class_t, None);
+        // R_set_altinteger_Is_sorted_method(class_t, None);
+        // R_set_altinteger_Sum_method(class_t, None);
+        // R_set_altinteger_Min_method(class_t, None);
+        // R_set_altinteger_Max_method(class_t, None);
+        R_set_altinteger_Elt_method(class_t, Some(altinteger_elt::<T>));
+    }
+
+    let _ = ALTINT_CLASS_VEC3.set(class_t);
+}
+
 #[allow(clippy::missing_safety_doc)]
 #[no_mangle]
-pub unsafe extern "C" fn init_altrep_class(dll_info: *mut DllInfo) {
+#[savvy_init]
+pub unsafe extern "C" fn init_altrep_class(dll_info: *mut savvy::ffi::DllInfo) {
     let class_t = unsafe {
         R_make_altinteger_class(
             c"Vec<i32>".as_ptr(),

@@ -34,8 +34,8 @@ dependencies = [
 
 [[package]]
 name = "savvy"
-version = "0.6.0"
-source = "git+https://github.com/yutannihilation/savvy?branch=altrep-experiment#e0c0dc863cc5cb9c0ffd836a5b5f0b649edeac19"
+version = "0.6.1"
+source = "git+https://github.com/yutannihilation/savvy?branch=altrep-experiment#ddc81dedc0030c1c4385713a24fea89d495b7b73"
 dependencies = [
  "cc",
  "once_cell",
@@ -45,8 +45,8 @@ dependencies = [
 
 [[package]]
 name = "savvy-bindgen"
-version = "0.6.0"
-source = "git+https://github.com/yutannihilation/savvy?branch=altrep-experiment#e0c0dc863cc5cb9c0ffd836a5b5f0b649edeac19"
+version = "0.6.1"
+source = "git+https://github.com/yutannihilation/savvy?branch=altrep-experiment#ddc81dedc0030c1c4385713a24fea89d495b7b73"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -55,13 +55,13 @@ dependencies = [
 
 [[package]]
 name = "savvy-ffi"
-version = "0.6.0"
-source = "git+https://github.com/yutannihilation/savvy?branch=altrep-experiment#e0c0dc863cc5cb9c0ffd836a5b5f0b649edeac19"
+version = "0.6.1"
+source = "git+https://github.com/yutannihilation/savvy?branch=altrep-experiment#ddc81dedc0030c1c4385713a24fea89d495b7b73"
 
 [[package]]
 name = "savvy-macro"
-version = "0.6.0"
-source = "git+https://github.com/yutannihilation/savvy?branch=altrep-experiment#e0c0dc863cc5cb9c0ffd836a5b5f0b649edeac19"
+version = "0.6.1"
+source = "git+https://github.com/yutannihilation/savvy?branch=altrep-experiment#ddc81dedc0030c1c4385713a24fea89d495b7b73"
 dependencies = [
  "proc-macro2",
  "quote",
