@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ffi::CString;
 use std::sync::OnceLock;
 
@@ -15,7 +16,8 @@ use savvy_ffi::{
     R_xlen_t, Rf_protect, Rf_unprotect, SEXP,
 };
 
-static MY_ALTINT_CLASS: OnceLock<R_altrep_class_t> = OnceLock::new();
+static mut ALTREP_CLASS_CATALOGUE: OnceLock<HashMap<&'static str, R_altrep_class_t>> =
+    OnceLock::new();
 
 pub trait AltInteger {
     const CLASS_NAME: &'static str;
@@ -92,12 +94,15 @@ impl AltInteger for MyAltInt {
 #[no_mangle]
 #[savvy_init]
 pub unsafe extern "C" fn init_altrep_class(dll_info: *mut savvy::ffi::DllInfo) {
+    ALTREP_CLASS_CATALOGUE.get_or_init(HashMap::new);
+    let catalogue = ALTREP_CLASS_CATALOGUE.get_mut().unwrap();
+
     let class_t = register_altinteger_class::<MyAltInt>(dll_info);
-    match MY_ALTINT_CLASS.set(class_t) {
-        Ok(_) => {}
-        Err(_) => {
-            r_eprintln!("The ALTREP class is already initializad. Something is wrong!");
-        }
+    if catalogue.insert(MyAltInt::CLASS_NAME, class_t).is_some() {
+        r_eprintln!(
+            "[WARN] ALTREP class {} is already defined. Something seems wrong.",
+            MyAltInt::CLASS_NAME
+        );
     }
 }
 
@@ -108,7 +113,11 @@ fn altint() -> savvy::Result<savvy::Sexp> {
 
     unsafe {
         Rf_protect(v_extptr);
-        let class = MY_ALTINT_CLASS.get().unwrap();
+        let class = ALTREP_CLASS_CATALOGUE
+            .get()
+            .unwrap()
+            .get(MyAltInt::CLASS_NAME)
+            .unwrap();
         let alt = R_new_altrep(*class, v_extptr, R_NilValue);
         Rf_protect(alt);
         MARK_NOT_MUTABLE(alt);
