@@ -25,7 +25,7 @@ impl AltInteger for MyAltInt {
 
 #[savvy]
 fn init_altrep_class(dll_info: *mut savvy::ffi::DllInfo) -> savvy::Result<()> {
-    register_altinteger_class::<MyAltInt>(dll_info);
+    register_altinteger_class::<MyAltInt>(dll_info)?;
     Ok(())
 }
 
