@@ -14,8 +14,7 @@ impl AltInteger for MyAltInt {
     const CLASS_NAME: &'static str = "MyAltInt";
 
     fn length(&mut self) -> usize {
-        // self.0.len()
-        3
+        self.0.len()
     }
 
     fn elt(&mut self, i: usize) -> i32 {
