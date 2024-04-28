@@ -12,6 +12,7 @@ impl MyAltInt {
 
 impl AltInteger for MyAltInt {
     const CLASS_NAME: &'static str = "MyAltInt";
+    const PACKAGE_NAME: &'static str = "TestPackage";
 
     fn length(&mut self) -> usize {
         self.0.len()
