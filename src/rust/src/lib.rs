@@ -1,7 +1,8 @@
+use std::ffi::CString;
 use std::sync::OnceLock;
 
-use savvy::savvy_init;
-use savvy::{get_external_pointer_addr, savvy, sexp::na};
+use savvy::{get_external_pointer_addr, savvy};
+use savvy::{r_eprintln, savvy_init, IntoExtPtrSexp};
 use savvy_ffi::{
     altrep::{
         R_altrep_class_t, R_altrep_data1, R_make_altinteger_class, R_new_altrep,
@@ -14,25 +15,23 @@ use savvy_ffi::{
     R_xlen_t, Rf_protect, Rf_unprotect, SEXP,
 };
 
-static ALTINT_CLASS_VEC3: OnceLock<R_altrep_class_t> = OnceLock::new();
+static MY_ALTINT_CLASS: OnceLock<R_altrep_class_t> = OnceLock::new();
 
 pub trait AltInteger {
+    const CLASS_NAME: &'static str;
+
     fn length(&mut self) -> usize;
     fn elt(&mut self, i: usize) -> i32;
 }
 
-/// # Safety
-///
-/// This function is unsafe.
-#[allow(clippy::not_unsafe_ptr_arg_deref)]
-#[no_mangle]
-#[savvy_init]
-pub unsafe extern "C" fn init_altrep_classregister_altinteger_class<T: 'static + AltInteger>(
+#[allow(clippy::missing_safety_doc)]
+pub unsafe extern "C" fn register_altinteger_class<T: 'static + AltInteger>(
     dll_info: *mut savvy::ffi::DllInfo,
-) {
+) -> R_altrep_class_t {
+    let class_cstr = CString::new(T::CLASS_NAME).unwrap_or_default();
     let class_t = unsafe {
         R_make_altinteger_class(
-            c"Vec<i32>".as_ptr(),
+            class_cstr.as_ptr(),
             c"savvy-altvec-test-package".as_ptr(),
             dll_info,
         )
@@ -65,83 +64,56 @@ pub unsafe extern "C" fn init_altrep_classregister_altinteger_class<T: 'static +
         R_set_altinteger_Elt_method(class_t, Some(altinteger_elt::<T>));
     }
 
-    let _ = ALTINT_CLASS_VEC3.set(class_t);
+    class_t
+}
+
+struct MyAltInt(Vec<i32>);
+impl savvy::IntoExtPtrSexp for MyAltInt {}
+
+impl MyAltInt {
+    fn new(x: Vec<i32>) -> Self {
+        Self(x)
+    }
+}
+
+impl AltInteger for MyAltInt {
+    const CLASS_NAME: &'static str = "MyAltInt";
+
+    fn length(&mut self) -> usize {
+        self.0.len()
+    }
+
+    fn elt(&mut self, i: usize) -> i32 {
+        self.0[i]
+    }
 }
 
 #[allow(clippy::missing_safety_doc)]
 #[no_mangle]
 #[savvy_init]
 pub unsafe extern "C" fn init_altrep_class(dll_info: *mut savvy::ffi::DllInfo) {
-    let class_t = unsafe {
-        R_make_altinteger_class(
-            c"Vec<i32>".as_ptr(),
-            c"savvy-altvec-test-package".as_ptr(),
-            dll_info,
-        )
-    };
-    unsafe extern "C" fn altrep_length(x: SEXP) -> R_xlen_t {
-        let x = match get_external_pointer_addr(R_altrep_data1(x)) {
-            Ok(ptr) => ptr as *mut Vec<i32>,
-            Err(_) => return 0,
-        };
-        x.as_ref().unwrap().len() as _
+    let class_t = register_altinteger_class::<MyAltInt>(dll_info);
+    match MY_ALTINT_CLASS.set(class_t) {
+        Ok(_) => {}
+        Err(_) => {
+            r_eprintln!("The ALTREP class is already initializad. Something is wrong!");
+        }
     }
-    unsafe extern "C" fn altinteger_elt(arg1: SEXP, arg2: R_xlen_t) -> std::os::raw::c_int {
-        let x = match get_external_pointer_addr(R_altrep_data1(arg1)) {
-            Ok(ptr) => ptr as *mut Vec<i32>,
-            Err(_) => return 0,
-        };
-        x.as_ref().unwrap()[arg2 as usize] as _
-    }
-
-    R_set_altrep_Length_method(class_t, Some(altrep_length));
-    // R_set_altinteger_No_NA_method(class_t, None);
-    // R_set_altinteger_Is_sorted_method(class_t, None);
-    // R_set_altinteger_Sum_method(class_t, None);
-    // R_set_altinteger_Min_method(class_t, None);
-    // R_set_altinteger_Max_method(class_t, None);
-    R_set_altinteger_Elt_method(class_t, Some(altinteger_elt));
-    // R_set_altinteger_Get_region_method(class_t, None);
-    ALTINT_CLASS_VEC3.set(class_t);
 }
 
 #[savvy]
 fn altint() -> savvy::Result<savvy::Sexp> {
-    let mut v = vec![1, 2, 3];
-
-    let boxed = Box::new(v);
-    let ptr = Box::into_raw(boxed);
-
-    unsafe extern "C" fn finalizer(x: SEXP) {
-        // bring back the ownership to Rust's side so that Rust will drop
-        // after this block ends.
-        let ptr = unsafe { R_ExternalPtrAddr(x) };
-
-        // the pointer can be null (e.g. https://github.com/pola-rs/r-polars/issues/851)
-        if !ptr.is_null() {
-            let rust_obj = unsafe { Box::from_raw(ptr as *mut Vec<i32>) };
-            drop(rust_obj);
-        }
-
-        unsafe { R_ClearExternalPtr(x) };
-    }
+    let v = MyAltInt::new(vec![1, 2, 3]);
+    let v_extptr = v.into_external_pointer().0;
 
     unsafe {
-        let external_pointer =
-            R_MakeExternalPtr(ptr as *mut std::os::raw::c_void, R_NilValue, R_NilValue);
-
-        Rf_protect(external_pointer);
-
-        // Use R_RegisterCFinalizerEx(..., TRUE) instead of
-        // R_RegisterCFinalizer() in order to make the cleanup happen during
-        // a shutdown of the R session as well.
-        R_RegisterCFinalizerEx(external_pointer, Some(finalizer), 1);
-
-        Rf_unprotect(1);
-
-        let class = ALTINT_CLASS_VEC3.get().unwrap();
-        let alt = R_new_altrep(*class, external_pointer, R_NilValue);
+        Rf_protect(v_extptr);
+        let class = MY_ALTINT_CLASS.get().unwrap();
+        let alt = R_new_altrep(*class, v_extptr, R_NilValue);
+        Rf_protect(alt);
         MARK_NOT_MUTABLE(alt);
+
+        Rf_unprotect(2);
 
         Ok(savvy::Sexp(alt))
     }
