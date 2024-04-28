@@ -34,6 +34,11 @@ SEXP handle_result(SEXP res_) {
     return (SEXP)res;
 }
 
+SEXP savvy_init_altrep_class__impl(DllInfo* dll_info) {
+    SEXP res = savvy_init_altrep_class__ffi(dll_info);
+    return handle_result(res);
+}
+
 SEXP savvy_altint__impl(void) {
     SEXP res = savvy_altint__ffi();
     return handle_result(res);
@@ -50,5 +55,5 @@ void R_init_savvyAltrepTest(DllInfo *dll) {
     R_useDynamicSymbols(dll, FALSE);
 
     // Functions for initialzation, if any.
-    init_altrep_class(dll);
+    savvy_init_altrep_class__impl(dll);
 }

@@ -1,5 +1,5 @@
 use savvy::altrep::{register_altinteger_class, AltInteger};
-use savvy::{savvy, savvy_init};
+use savvy::savvy;
 
 struct MyAltInt(Vec<i32>);
 impl savvy::IntoExtPtrSexp for MyAltInt {}
@@ -23,11 +23,10 @@ impl AltInteger for MyAltInt {
     }
 }
 
-#[allow(clippy::missing_safety_doc)]
-#[no_mangle]
-#[savvy_init]
-pub unsafe extern "C" fn init_altrep_class(dll_info: *mut savvy::ffi::DllInfo) {
+#[savvy]
+fn init_altrep_class(dll_info: *mut savvy::ffi::DllInfo) -> savvy::Result<()> {
     register_altinteger_class::<MyAltInt>(dll_info);
+    Ok(())
 }
 
 #[savvy]
